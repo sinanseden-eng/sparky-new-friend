@@ -1,0 +1,912 @@
+<!doctype html>
+<html lang="en">
+ <head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Sparky's New Friend</title>
+  <script src="https://cdn.tailwindcss.com/3.4.17"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Alegreya:ital,wght@0,400;0,700;1,400&amp;family=Fraunces:wght@700;900&amp;display=swap" rel="stylesheet">
+  <style>
+        /* Tüm cihazlar için temel ayarlar */
+        * {
+            box-sizing: border-box;
+        }
+        body { 
+            font-family: 'Alegreya', serif; 
+            background-color: #0f172a; 
+            background-image: radial-gradient(circle at 50% 30%, #1e293b 0%, #0f172a 80%);
+            min-height: 100vh;
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            perspective: 2500px;
+            overflow-x: hidden; 
+        }
+        
+        /* 3D Kitap Sahnesi */
+        .book-stage {
+            transform-style: preserve-3d;
+            transform: rotateX(30deg);
+            max-width: 800px;
+            width: 100%;
+            position: relative;
+            z-index: 10;
+        }
+
+        /* Sayfa Geçiş Animasyonları */
+        .scene { 
+            display: none; 
+            position: relative;
+            transform-style: preserve-3d;
+        }
+        .scene.active { 
+            display: block; 
+            animation-duration: 1s; 
+            animation-timing-function: cubic-bezier(0.22, 1, 0.36, 1);
+            animation-fill-mode: forwards;
+        }
+        
+        /* İleri Çevirme (Sağdan Sola) */
+        .scene.active.forward {
+            animation-name: turnForward;
+        }
+        @keyframes turnForward {
+            0% { transform: rotateY(-95deg); transform-origin: right center; opacity: 1; box-shadow: -20px 15px 30px rgba(0,0,0,0.5); }
+            100% { transform: rotateY(0deg); transform-origin: right center; opacity: 1; box-shadow: 0 0 0 rgba(0,0,0,0); }
+        }
+
+        /* Geri Çevirme (Soldan Sağa) */
+        .scene.active.backward {
+            animation-name: turnBackward;
+        }
+        @keyframes turnBackward {
+            0% { transform: rotateY(95deg); transform-origin: left center; opacity: 1; box-shadow: 20px 15px 30px rgba(0,0,0,0.5); }
+            100% { transform: rotateY(0deg); transform-origin: left center; opacity: 1; box-shadow: 0 0 0 rgba(0,0,0,0); }
+        }
+
+        /* Kitap Sayfası Tasarımı (Cool Silver/Blue Theme) */
+        .book-page {
+            background-color: #f8fafc; /* Cool white paper */
+            background-image: 
+                url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.75' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.08'/%3E%3C/svg%3E"),
+                linear-gradient(to right, #e2e8f0 0px, #f8fafc 15px, #f8fafc 100%);
+            color: #1e293b; /* Dark slate text */
+            border-radius: 0px 8px 8px 0px;
+            position: relative;
+            overflow: hidden;
+            padding: 50px 50px 90px 50px;
+            z-index: 10;
+        }
+
+        /* Görünür Sayfa Yığını (Cool greys) */
+        .book-page::after {
+            content: '';
+            position: absolute;
+            top: 0; right: 0; bottom: 0;
+            width: 100%;
+            background: transparent;
+            border-radius: 0px 8px 8px 0px;
+            box-shadow: 
+                2px 0 0 #cbd5e1, 4px 0 0 #94a3b8,
+                6px 0 0 #64748b, 8px 0 0 #475569,
+                10px 0 0 #334155, 15px 25px 40px rgba(0,0,0,0.6);
+            z-index: -1;
+            transform: translateZ(-15px);
+        }
+
+        /* Dikişli Cilt ve Sırt (Metallic Blue with Cyan stitches) */
+        .book-spine {
+            position: absolute;
+            left: 0; top: 0; bottom: 0;
+            width: 18px;
+            background: #1e293b; /* Dark metallic blue */
+            border-radius: 5px 0 0 5px;
+            z-index: 5;
+            box-shadow: inset -3px 0 8px rgba(0,0,0,0.6), inset 2px 0 2px rgba(255,255,255,0.1);
+        }
+        .book-spine::before {
+            content: '';
+            position: absolute;
+            top: 20px; bottom: 20px; left: 50%;
+            width: 2px;
+            background-image: repeating-linear-gradient(to bottom, #38bdf8 0px, #38bdf8 8px, transparent 8px, transparent 18px); /* Glowing cyan stitches */
+            transform: translateX(-50%);
+            opacity: 0.9;
+            box-shadow: 0 0 5px rgba(56, 189, 248, 0.5);
+        }
+
+        .book-page::before {
+            content: '';
+            position: absolute;
+            top: 0; left: 18px; bottom: 0;
+            width: 40px;
+            background: linear-gradient(to right, rgba(0,0,0,0.25), transparent);
+            pointer-events: none;
+            z-index: 1;
+        }
+        
+        .story-img { 
+            border: 1px solid #cbd5e1; 
+            box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+            border-radius: 4px;
+            position: relative;
+            z-index: 2;
+        }
+        
+        h1, h2 {
+            font-family: 'Fraunces', serif;
+            color: #334155;
+            letter-spacing: 1px;
+            text-shadow: 1px 1px 0px rgba(255,255,255,0.5);
+            position: relative;
+            z-index: 2;
+        }
+
+        .story-content > p:first-of-type::first-letter {
+            font-size: 3.5rem;
+            float: left;
+            line-height: 0.8;
+            margin: 5px 8px 0 0;
+            font-family: 'Fraunces', serif;
+            color: #3b82f6; /* Robot blue */
+            font-weight: 700;
+        }
+
+        .story-content { position: relative; z-index: 2; }
+        .story-content p { margin-bottom: 1.2rem; line-height: 1.8; text-align: justify; }
+        
+        /* Buton Renkleri (Sci-Fi Tema) */
+        .choice-btn {
+            display: block;
+            width: 100%;
+            background: #334155; /* Dark slate blue */
+            color: #f8fafc;
+            font-family: 'Fraunces', serif;
+            font-size: 1.1rem;
+            padding: 12px;
+            margin: 10px 0;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: 0.2s;
+            text-align: center;
+            position: relative;
+            z-index: 2;
+        }
+        .choice-btn:hover { background: #1e293b; transform: translateY(-2px); }
+        .btn-try { background: #dc2626; } /* Red for try again */
+        .btn-try:hover { background: #b91c1c; }
+        .btn-end { background: #10b981; } /* Green for happy ending */
+        .btn-end:hover { background: #059669; }
+
+        /* Sayfa Numarası */
+        .page-number {
+            position: absolute;
+            bottom: 25px;
+            left: 50%;
+            transform: translateX(-50%);
+            font-family: 'Fraunces', serif;
+            color: #64748b;
+            font-size: 14px;
+            z-index: 20;
+            opacity: 0.8;
+        }
+
+        /* Sayfa Kıvrımları (Köşeler) */
+        .page-corner {
+            position: absolute; bottom: 0;
+            width: 50px; height: 50px;
+            cursor: pointer;
+            transition: all 0.4s ease;
+            z-index: 20;
+        }
+        .page-corner-right {
+            right: 0;
+            background: linear-gradient(135deg, transparent 50%, #e2e8f0 50%);
+            box-shadow: -2px -3px 6px rgba(0,0,0,0.1);
+            border-radius: 0 0 8px 0;
+        }
+        .page-corner-right:hover {
+            width: 70px; height: 70px;
+            background: linear-gradient(135deg, transparent 50%, #cbd5e1 50%);
+            box-shadow: -4px -5px 10px rgba(0,0,0,0.2);
+        }
+        .page-corner-left {
+            left: 0;
+            background: linear-gradient(225deg, transparent 50%, #e2e8f0 50%);
+            box-shadow: 2px -3px 6px rgba(0,0,0,0.1);
+            border-radius: 0 0 0 8px;
+        }
+        .page-corner-left:hover {
+            width: 70px; height: 70px;
+            background: linear-gradient(225deg, transparent 50%, #cbd5e1 50%);
+            box-shadow: 4px -5px 10px rgba(0,0,0,0.2);
+        }
+        .page-corner::after {
+            content: '❯';
+            position: absolute; bottom: 12px; right: 15px;
+            font-size: 14px; color: #64748b; opacity: 0.7;
+        }
+        .page-corner-left::after { content: '❮'; right: auto; left: 15px; }
+
+        /* Baştan Başla Butonu (Sadece biten sayfalarda) */
+        .replay-btn {
+            position: absolute;
+            bottom: 20px;
+            right: 20px;
+            background: #334155;
+            color: #f8fafc;
+            padding: 8px 16px;
+            border-radius: 8px;
+            font-family: 'Fraunces', serif;
+            font-size: 14px;
+            cursor: pointer;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.2);
+            transition: all 0.3s ease;
+            z-index: 20;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .replay-btn:hover {
+            background: #1e293b;
+            transform: translateY(-2px);
+            box-shadow: 0 6px 10px rgba(0,0,0,0.3);
+        }
+
+        /* Künye Stili (Sadece 1. ve biten sayfalarda) */
+        .kunye-box {
+            margin-top: 40px; padding: 20px;
+            background-color: rgba(51, 65, 85, 0.05);
+            border-top: 1px solid #334155; border-bottom: 1px solid #334155;
+            font-size: 16px; color: #1e293b; text-align: center;
+            font-family: 'Fraunces', serif; position: relative; z-index: 2;
+        }
+
+        /* TABLET AYARLARI */
+        @media (max-width: 1024px) {
+            body { padding: 20px 10px; align-items: flex-start; }
+            .book-stage { transform: rotateX(15deg); max-width: 95%; }
+            .book-page { padding: 40px 35px 80px 35px; }
+        }
+
+        /* TELEFON AYARLARI */
+        @media (max-width: 768px) {
+            body { padding: 10px; perspective: 1200px; }
+            .book-stage { transform: none; max-width: 100%; }
+            .book-page { padding: 30px 20px 70px 25px; }
+            .book-page::after {
+                box-shadow: 2px 0 0 #cbd5e1, 4px 0 0 #94a3b8, 5px 10px 15px rgba(0,0,0,0.4);
+                transform: translateZ(0); 
+            }
+            h1 { font-size: 2.5rem; }
+            h2 { font-size: 2rem; }
+            .story-content { font-size: 1.1rem; }
+            .story-content > p:first-of-type::first-letter { font-size: 2.8rem; }
+            .kunye-box { font-size: 14px; padding: 15px; }
+            .replay-btn { font-size: 12px; padding: 6px 12px; bottom: 15px; right: 15px; }
+        }
+    </style>
+ </head>
+ <body>
+  <main class="book-stage">
+
+   <!-- SAYFA 1 -->
+   <div id="page1" class="scene active forward">
+    <div class="book-page">
+     <div class="book-spine"></div>
+     <h1 class="text-center mb-8 text-5xl md:text-6xl">Sparky's New Friend</h1>
+     <img src="1.jpg" alt="Sparky in the lab" class="story-img w-full max-w-xl mx-auto rounded-xl mb-8 object-contain">
+     <div class="story-content text-xl">
+      <p>Sparky is a robot. Dr. Vic made him in a lab. Sparky is big and silver. He has blue bolts. He has a round light on his chest. It is his heart-light. Today, the light is blue. Sparky is lonely. He wants a friend.</p>
+      <p>"Go find a friend," says Dr. Vic. Sparky goes outside. He sees three paths.</p>
+      <button class="choice-btn" onclick="goTo('page2', 'forward')">If Sparky goes to the Village, go to PAGE 2</button>
+      <button class="choice-btn" onclick="goTo('page3', 'forward')">If Sparky goes to the Forest, go to PAGE 3</button>
+      <button class="choice-btn" onclick="goTo('page4', 'forward')">If Sparky goes to the Garden, go to PAGE 4</button>
+     </div>
+     <div class="kunye-box">
+        <p>Developed by Sinan Seden</p>
+     </div>
+     <div class="page-number">1 / 35</div>
+     <div class="page-corner page-corner-right" onclick="goTo('page2', 'forward')"></div>
+    </div>
+   </div>
+
+   <!-- SAYFA 2 -->
+   <div id="page2" class="scene">
+    <div class="book-page">
+     <div class="book-spine"></div>
+     <h2 class="text-center mb-8 text-4xl">The Sunny Village</h2>
+     <img src="2.jpg" alt="Village" class="story-img w-full max-w-xl mx-auto rounded-xl mb-8 object-contain">
+     <div class="story-content text-xl">
+      <p>Sparky walks to the village. He sees small houses. He sees children. The children see his bolts. "A monster!" they shout. They run inside. Bang! Bang! Sparky is sad. "I am not a monster," he says. He sees a bakery. He sees a town square.</p>
+      <button class="choice-btn" onclick="goTo('page5', 'forward')">If Sparky goes to the bakery, go to PAGE 5</button>
+      <button class="choice-btn" onclick="goTo('page6', 'forward')">If Sparky goes to the square, go to PAGE 6</button>
+     </div>
+     <div class="page-number">2 / 35</div>
+     <div class="page-corner page-corner-left" onclick="goTo('page1', 'backward')"></div>
+     <div class="page-corner page-corner-right" onclick="goTo('page5', 'forward')"></div>
+    </div>
+   </div>
+
+   <!-- SAYFA 3 -->
+   <div id="page3" class="scene">
+    <div class="book-page">
+     <div class="book-spine"></div>
+     <h2 class="text-center mb-8 text-4xl">The Dark Forest</h2>
+     <img src="3.jpg" alt="Forest" class="story-img w-full max-w-xl mx-auto rounded-xl mb-8 object-contain">
+     <div class="story-content text-xl">
+      <p>Sparky walks into the forest. The trees are tall. Leaves go crunch under his feet. He sees a grumpy owl. He hears a river.</p>
+      <button class="choice-btn" onclick="goTo('page7', 'forward')">If Sparky asks the owl, go to PAGE 7</button>
+      <button class="choice-btn" onclick="goTo('page8', 'forward')">If Sparky goes to the river, go to PAGE 8</button>
+     </div>
+     <div class="page-number">3 / 35</div>
+     <div class="page-corner page-corner-left" onclick="goTo('page1', 'backward')"></div>
+     <div class="page-corner page-corner-right" onclick="goTo('page7', 'forward')"></div>
+    </div>
+   </div>
+
+   <!-- SAYFA 4 -->
+   <div id="page4" class="scene">
+    <div class="book-page">
+     <div class="book-spine"></div>
+     <h2 class="text-center mb-8 text-4xl">The Stone Garden</h2>
+     <img src="4.jpg" alt="Garden" class="story-img w-full max-w-xl mx-auto rounded-xl mb-8 object-contain">
+     <div class="story-content text-xl">
+      <p>Sparky goes to a quiet garden. There are stone statues. He sees a small stone boy. The boy looks sad. Sparky feels sad, too.</p>
+      <button class="choice-btn" onclick="goTo('page9', 'forward')">If Sparky cleans the boy, go to PAGE 9</button>
+      <button class="choice-btn" onclick="goTo('page19', 'forward')">If Sparky talks to the boy, go to PAGE 19</button>
+      <button class="choice-btn" onclick="goTo('page10', 'forward')">If Sparky sits like a statue, go to PAGE 10</button>
+     </div>
+     <div class="page-number">4 / 35</div>
+     <div class="page-corner page-corner-left" onclick="goTo('page1', 'backward')"></div>
+     <div class="page-corner page-corner-right" onclick="goTo('page9', 'forward')"></div>
+    </div>
+   </div>
+
+   <!-- SAYFA 5 -->
+   <div id="page5" class="scene">
+    <div class="book-page">
+     <div class="book-spine"></div>
+     <h2 class="text-center mb-8 text-4xl">The Bakery</h2>
+     <img src="5.jpg" alt="Bakery" class="story-img w-full max-w-xl mx-auto rounded-xl mb-8 object-contain">
+     <div class="story-content text-xl">
+      <p>Sparky goes into the bakery. It smells like bread. The baker smiles at him. "Hello, big robot," she says. Sparky sees warm bread. He sees sticky dough.</p>
+      <button class="choice-btn" onclick="goTo('page11', 'forward')">If Sparky eats the bread, go to PAGE 11</button>
+      <button class="choice-btn" onclick="goTo('page12', 'forward')">If Sparky helps the baker, go to PAGE 12</button>
+     </div>
+     <div class="page-number">5 / 35</div>
+     <div class="page-corner page-corner-left" onclick="goTo('page2', 'backward')"></div>
+     <div class="page-corner page-corner-right" onclick="goTo('page11', 'forward')"></div>
+    </div>
+   </div>
+
+   <!-- SAYFA 6 -->
+   <div id="page6" class="scene">
+    <div class="book-page">
+     <div class="book-spine"></div>
+     <h2 class="text-center mb-8 text-4xl">The Town Square</h2>
+     <img src="6.jpg" alt="Town Square" class="story-img w-full max-w-xl mx-auto rounded-xl mb-8 object-contain">
+     <div class="story-content text-xl">
+      <p>Sparky goes to the square. He hears a sound. "Whimper." A little dog is stuck in a dry well! The dog is sad. Sparky wants to help. He sees a rope. He could pull the dog. Or he could yell for help. He could also jump in.</p>
+      <button class="choice-btn" onclick="goTo('page13', 'forward')">If Sparky pulls the dog, go to PAGE 13</button>
+      <button class="choice-btn" onclick="goTo('page14', 'forward')">If Sparky yells, go to PAGE 14</button>
+      <button class="choice-btn" onclick="goTo('page21', 'forward')">If Sparky jumps in the well, go to PAGE 21</button>
+     </div>
+     <div class="page-number">6 / 35</div>
+     <div class="page-corner page-corner-left" onclick="goTo('page2', 'backward')"></div>
+     <div class="page-corner page-corner-right" onclick="goTo('page13', 'forward')"></div>
+    </div>
+   </div>
+
+   <!-- SAYFA 7 -->
+   <div id="page7" class="scene">
+    <div class="book-page">
+     <div class="book-spine"></div>
+     <h2 class="text-center mb-8 text-4xl">The Grumpy Owl</h2>
+     <img src="7.jpg" alt="Owl" class="story-img w-full max-w-xl mx-auto rounded-xl mb-8 object-contain">
+     <div class="story-content text-xl">
+      <p>"Where is a friend?" Sparky asks the owl. The owl points his wing. "Go to Windy Hill," he says. Sparky sees the big hill. The wind blows hard. Sparky is tired.</p>
+      <button class="choice-btn" onclick="goTo('page15', 'forward')">If Sparky climbs now, go to PAGE 15</button>
+      <button class="choice-btn" onclick="goTo('page16', 'forward')">If Sparky rests under a tree, go to PAGE 16</button>
+     </div>
+     <div class="page-number">7 / 35</div>
+     <div class="page-corner page-corner-left" onclick="goTo('page3', 'backward')"></div>
+     <div class="page-corner page-corner-right" onclick="goTo('page15', 'forward')"></div>
+    </div>
+   </div>
+
+   <!-- SAYFA 8 -->
+   <div id="page8" class="scene">
+    <div class="book-page">
+     <div class="book-spine"></div>
+     <h2 class="text-center mb-8 text-4xl">The River</h2>
+     <img src="8.jpg" alt="River" class="story-img w-full max-w-xl mx-auto rounded-xl mb-8 object-contain">
+     <div class="story-content text-xl">
+      <p>Sparky walks by the river. He sees a green frog. "Hello!" Sparky says. He gets excited. Zap! Zap! Sparks fly from his neck. The frog jumps away. Sparky looks at the cold water.</p>
+      <button class="choice-btn" onclick="goTo('page17', 'forward')">If Sparky swims, go to PAGE 17</button>
+      <button class="choice-btn" onclick="goTo('page22', 'forward')">If Sparky drinks the water, go to PAGE 22</button>
+      <button class="choice-btn" onclick="goTo('page18', 'forward')">If Sparky runs to the lab, go to PAGE 18</button>
+     </div>
+     <div class="page-number">8 / 35</div>
+     <div class="page-corner page-corner-left" onclick="goTo('page3', 'backward')"></div>
+     <div class="page-corner page-corner-right" onclick="goTo('page17', 'forward')"></div>
+    </div>
+   </div>
+
+   <!-- SAYFA 9 (Ending 1) -->
+   <div id="page9" class="scene">
+    <div class="book-page">
+     <div class="book-spine"></div>
+     <h2 class="text-center mb-8 text-4xl">The Magic Stone (Ending 1)</h2>
+     <img src="9.jpg" alt="Magic Stone" class="story-img w-full max-w-xl mx-auto rounded-xl mb-8 object-contain">
+     <div class="story-content text-xl">
+      <p>Sparky finds a soft cloth. He wipes the dirt off the stone boy. Rub, rub. The stone shines in the sun. Suddenly, the boy blinks! He smiles! "Thank you, Sparky! You broke the spell!" The boy takes Sparky's hand. Sparky has a friend!</p>
+      <button class="choice-btn btn-end" onclick="goTo('page1', 'forward')">THE END. You found a friend! Read Again.</button>
+     </div>
+     <div class="kunye-box">
+        <p>Developed by Sinan Seden</p>
+     </div>
+     <div class="page-number">9 / 35</div>
+     <div class="page-corner page-corner-left" onclick="goTo('page4', 'backward')"></div>
+     <div class="replay-btn" onclick="goTo('page1', 'forward')">Start Over 🔁</div>
+    </div>
+   </div>
+
+   <!-- SAYFA 10 -->
+   <div id="page10" class="scene">
+    <div class="book-page">
+     <div class="book-spine"></div>
+     <h2 class="text-center mb-8 text-4xl">The Bird (Try Again)</h2>
+     <img src="10.jpg" alt="Bird" class="story-img w-full max-w-xl mx-auto rounded-xl mb-8 object-contain">
+     <div class="story-content text-xl">
+      <p>Sparky sits very still. He acts like a statue. A little bird flies down. She thinks Sparky is a rock. She sits on his nose! Sparky does not like it. "Shoo!" he says. The bird flies away. That is OK! Let's try again.</p>
+      <button class="choice-btn btn-try" onclick="goTo('page4', 'backward')">Turn back to PAGE 4 and choose again</button>
+     </div>
+     <div class="page-number">10 / 35</div>
+     <div class="page-corner page-corner-left" onclick="goTo('page4', 'backward')"></div>
+     <div class="page-corner page-corner-right" onclick="goTo('page4', 'backward')"></div>
+    </div>
+   </div>
+
+   <!-- SAYFA 11 -->
+   <div id="page11" class="scene">
+    <div class="book-page">
+     <div class="book-spine"></div>
+     <h2 class="text-center mb-8 text-4xl">The Sticky Bread (Try Again)</h2>
+     <img src="11.jpg" alt="Sticky Bread" class="story-img w-full max-w-xl mx-auto rounded-xl mb-8 object-contain">
+     <div class="story-content text-xl">
+      <p>Sparky eats the bread. Crunch, crunch. Uh oh! The bread is sticky. It gets stuck in his gears. Clank! Clank! The baker uses oil to fix him. "Bread is for people," she says. That is OK! Let's try again.</p>
+      <button class="choice-btn btn-try" onclick="goTo('page5', 'backward')">Turn back to PAGE 5 and choose again</button>
+     </div>
+     <div class="page-number">11 / 35</div>
+     <div class="page-corner page-corner-left" onclick="goTo('page5', 'backward')"></div>
+     <div class="page-corner page-corner-right" onclick="goTo('page5', 'backward')"></div>
+    </div>
+   </div>
+
+   <!-- SAYFA 12 -->
+   <div id="page12" class="scene">
+    <div class="book-page">
+     <div class="book-spine"></div>
+     <h2 class="text-center mb-8 text-4xl">Helping Hands</h2>
+     <img src="12.jpg" alt="Dough" class="story-img w-full max-w-xl mx-auto rounded-xl mb-8 object-contain">
+     <div class="story-content text-xl">
+      <p>Sparky helps the baker. He puts his hands in the dough. He can push hard, or he can be gentle.</p>
+      <button class="choice-btn" onclick="goTo('page33', 'forward')">If Sparky pushes hard, go to PAGE 33</button>
+      <button class="choice-btn" onclick="goTo('page34', 'forward')">If Sparky is gentle, go to PAGE 34</button>
+     </div>
+     <div class="page-number">12 / 35</div>
+     <div class="page-corner page-corner-left" onclick="goTo('page5', 'backward')"></div>
+     <div class="page-corner page-corner-right" onclick="goTo('page33', 'forward')"></div>
+    </div>
+   </div>
+
+   <!-- SAYFA 13 (Ending 2) -->
+   <div id="page13" class="scene">
+    <div class="book-page">
+     <div class="book-spine"></div>
+     <h2 class="text-center mb-8 text-4xl">The Strong Robot (Ending 2)</h2>
+     <img src="13.jpg" alt="Dog Saved" class="story-img w-full max-w-xl mx-auto rounded-xl mb-8 object-contain">
+     <div class="story-content text-xl">
+      <p>Sparky ties the rope to his arm. He pulls. Pull, pull! The dog comes up. The dog is safe! The dog licks Sparky's face. Woof! Sparky laughs. His heart-light glows yellow. He has a friend!</p>
+      <button class="choice-btn btn-end" onclick="goTo('page1', 'forward')">THE END. You found a friend! Read Again.</button>
+     </div>
+     <div class="kunye-box">
+        <p>Developed by Sinan Seden</p>
+     </div>
+     <div class="page-number">13 / 35</div>
+     <div class="page-corner page-corner-left" onclick="goTo('page6', 'backward')"></div>
+     <div class="replay-btn" onclick="goTo('page1', 'forward')">Start Over 🔁</div>
+    </div>
+   </div>
+
+   <!-- SAYFA 14 -->
+   <div id="page14" class="scene">
+    <div class="book-page">
+     <div class="book-spine"></div>
+     <h2 class="text-center mb-8 text-4xl">The Loud Voice (Try Again)</h2>
+     <img src="14.jpg" alt="Scared Villagers" class="story-img w-full max-w-xl mx-auto rounded-xl mb-8 object-contain">
+     <div class="story-content text-xl">
+      <p>Sparky yells for help. "HEEEELP!" His voice is too loud. It booms like thunder. The people get scared. They chase him with brooms! Sparky runs away. That is OK! A quiet voice is better. Let's try again.</p>
+      <button class="choice-btn btn-try" onclick="goTo('page6', 'backward')">Turn back to PAGE 6 and choose again</button>
+     </div>
+     <div class="page-number">14 / 35</div>
+     <div class="page-corner page-corner-left" onclick="goTo('page6', 'backward')"></div>
+     <div class="page-corner page-corner-right" onclick="goTo('page6', 'backward')"></div>
+    </div>
+   </div>
+
+   <!-- SAYFA 15 -->
+   <div id="page15" class="scene">
+    <div class="book-page">
+     <div class="book-spine"></div>
+     <h2 class="text-center mb-8 text-4xl">Windy Hill</h2>
+     <img src="15.jpg" alt="Windy Hill" class="story-img w-full max-w-xl mx-auto rounded-xl mb-8 object-contain">
+     <div class="story-content text-xl">
+      <p>Sparky climbs the hill. The wind blows. Whoosh! At the top, he sees a broken windmill. He sees a sad grey cat. He sees a dark cave. He also feels very tired.</p>
+      <button class="choice-btn" onclick="goTo('page23', 'forward')">If Sparky plays with the cat, go to PAGE 23</button>
+      <button class="choice-btn" onclick="goTo('page24', 'forward')">If Sparky fixes the windmill, go to PAGE 24</button>
+      <button class="choice-btn" onclick="goTo('page25', 'forward')">If Sparky goes in the cave, go to PAGE 25</button>
+      <button class="choice-btn" onclick="goTo('page20', 'forward')">If Sparky goes to sleep, go to PAGE 20</button>
+     </div>
+     <div class="page-number">15 / 35</div>
+     <div class="page-corner page-corner-left" onclick="goTo('page7', 'backward')"></div>
+     <div class="page-corner page-corner-right" onclick="goTo('page23', 'forward')"></div>
+    </div>
+   </div>
+
+   <!-- SAYFA 16 -->
+   <div id="page16" class="scene">
+    <div class="book-page">
+     <div class="book-spine"></div>
+     <h2 class="text-center mb-8 text-4xl">The Rain (Try Again)</h2>
+     <img src="16.jpg" alt="Rain" class="story-img w-full max-w-xl mx-auto rounded-xl mb-8 object-contain">
+     <div class="story-content text-xl">
+      <p>Sparky rests under a tree. He falls asleep. Zzzzz. Then, it rains! Drip, drip! Water gets in his gears. Bzzzzt! Dr. Vic runs out with an umbrella. "Do not sleep in the rain!" he says. That is OK! Let's try again.</p>
+      <button class="choice-btn btn-try" onclick="goTo('page7', 'backward')">Turn back to PAGE 7 and choose again</button>
+     </div>
+     <div class="page-number">16 / 35</div>
+     <div class="page-corner page-corner-left" onclick="goTo('page7', 'backward')"></div>
+     <div class="page-corner page-corner-right" onclick="goTo('page7', 'backward')"></div>
+    </div>
+   </div>
+
+   <!-- SAYFA 17 -->
+   <div id="page17" class="scene">
+    <div class="book-page">
+     <div class="book-spine"></div>
+     <h2 class="text-center mb-8 text-4xl">The Short Circuit (Try Again)</h2>
+     <img src="17.jpg" alt="River Splash" class="story-img w-full max-w-xl mx-auto rounded-xl mb-8 object-contain">
+     <div class="story-content text-xl">
+      <p>Sparky jumps in the river. Splash! Then, BZZZZT! Water and robots do not mix. Sparky freezes up. Dr. Vic scoops him out with a net. "Robots do not swim," he says. That is OK! Let's try again.</p>
+      <button class="choice-btn btn-try" onclick="goTo('page8', 'backward')">Turn back to PAGE 8 and choose again</button>
+     </div>
+     <div class="page-number">17 / 35</div>
+     <div class="page-corner page-corner-left" onclick="goTo('page8', 'backward')"></div>
+     <div class="page-corner page-corner-right" onclick="goTo('page8', 'backward')"></div>
+    </div>
+   </div>
+
+   <!-- SAYFA 18 -->
+   <div id="page18" class="scene">
+    <div class="book-page">
+     <div class="book-spine"></div>
+     <h2 class="text-center mb-8 text-4xl">The Scared Robot (Try Again)</h2>
+     <img src="18.jpg" alt="Scared Robot" class="story-img w-full max-w-xl mx-auto rounded-xl mb-8 object-contain">
+     <div class="story-content text-xl">
+      <p>Sparky runs back to the lab. "I am scared," he tells Dr. Vic. "Making friends is hard," Dr. Vic says. "But you are brave. Do not give up." Sparky feels braver. He goes back to the forest. That is OK! Let's try again.</p>
+      <button class="choice-btn btn-try" onclick="goTo('page3', 'backward')">Turn back to PAGE 3 and choose again</button>
+     </div>
+     <div class="page-number">18 / 35</div>
+     <div class="page-corner page-corner-left" onclick="goTo('page3', 'backward')"></div>
+     <div class="page-corner page-corner-right" onclick="goTo('page3', 'backward')"></div>
+    </div>
+   </div>
+
+   <!-- SAYFA 19 -->
+   <div id="page19" class="scene">
+    <div class="book-page">
+     <div class="book-spine"></div>
+     <h2 class="text-center mb-8 text-4xl">The Quiet Boy (Try Again)</h2>
+     <img src="19.jpg" alt="Quiet Boy" class="story-img w-full max-w-xl mx-auto rounded-xl mb-8 object-contain">
+     <div class="story-content text-xl">
+      <p>Sparky talks to the stone boy. "Hello," he says. The boy does not answer. He is made of stone. Sparky feels very sad. He walks away. That is OK! Talking to stone is hard. Let's try again.</p>
+      <button class="choice-btn btn-try" onclick="goTo('page4', 'backward')">Turn back to PAGE 4 and choose again</button>
+     </div>
+     <div class="page-number">19 / 35</div>
+     <div class="page-corner page-corner-left" onclick="goTo('page4', 'backward')"></div>
+     <div class="page-corner page-corner-right" onclick="goTo('page4', 'backward')"></div>
+    </div>
+   </div>
+
+   <!-- SAYFA 20 -->
+   <div id="page20" class="scene">
+    <div class="book-page">
+     <div class="book-spine"></div>
+     <h2 class="text-center mb-8 text-4xl">The Wind (Try Again)</h2>
+     <img src="20.jpg" alt="Wind" class="story-img w-full max-w-xl mx-auto rounded-xl mb-8 object-contain">
+     <div class="story-content text-xl">
+      <p>Sparky lies down on the hill. He goes to sleep. Zzzzz. The wind blows hard. Whoosh! It rolls Sparky right down the hill! Bump, bump, bump. He lands at the bottom. That is OK! It is too windy to sleep. Let's try again.</p>
+      <button class="choice-btn btn-try" onclick="goTo('page15', 'backward')">Turn back to PAGE 15 and choose again</button>
+     </div>
+     <div class="page-number">20 / 35</div>
+     <div class="page-corner page-corner-left" onclick="goTo('page15', 'backward')"></div>
+     <div class="page-corner page-corner-right" onclick="goTo('page15', 'backward')"></div>
+    </div>
+   </div>
+
+   <!-- SAYFA 21 -->
+   <div id="page21" class="scene">
+    <div class="book-page">
+     <div class="book-spine"></div>
+     <h2 class="text-center mb-8 text-4xl">The Dark Well (Try Again)</h2>
+     <img src="21.jpg" alt="Dark Well" class="story-img w-full max-w-xl mx-auto rounded-xl mb-8 object-contain">
+     <div class="story-content text-xl">
+      <p>Sparky jumps into the well to get the dog. But the well is very deep and very dark! Sparky gets stuck at the bottom, too. Now they are both stuck. The baker has to pull them both out. That is OK! Let's try again.</p>
+      <button class="choice-btn btn-try" onclick="goTo('page6', 'backward')">Turn back to PAGE 6 and choose again</button>
+     </div>
+     <div class="page-number">21 / 35</div>
+     <div class="page-corner page-corner-left" onclick="goTo('page6', 'backward')"></div>
+     <div class="page-corner page-corner-right" onclick="goTo('page6', 'backward')"></div>
+    </div>
+   </div>
+
+   <!-- SAYFA 22 -->
+   <div id="page22" class="scene">
+    <div class="book-page">
+     <div class="book-spine"></div>
+     <h2 class="text-center mb-8 text-4xl">The Sparks (Try Again)</h2>
+     <img src="22.jpg" alt="Sparks" class="story-img w-full max-w-xl mx-auto rounded-xl mb-8 object-contain">
+     <div class="story-content text-xl">
+      <p>Sparky drinks some river water. Gulping water makes his neck bolts spark. Zap! Zap! Zap! The sparks scare the fish. The fish splash water in his face. Sparky coughs. "Robots should not drink water," he says. That is OK! Let's try again.</p>
+      <button class="choice-btn btn-try" onclick="goTo('page8', 'backward')">Turn back to PAGE 8 and choose again</button>
+     </div>
+     <div class="page-number">22 / 35</div>
+     <div class="page-corner page-corner-left" onclick="goTo('page8', 'backward')"></div>
+     <div class="page-corner page-corner-right" onclick="goTo('page8', 'backward')"></div>
+    </div>
+   </div>
+
+   <!-- SAYFA 23 -->
+   <div id="page23" class="scene">
+    <div class="book-page">
+     <div class="book-spine"></div>
+     <h2 class="text-center mb-8 text-4xl">The Grey Cat</h2>
+     <img src="23.jpg" alt="Grey Cat" class="story-img w-full max-w-xl mx-auto rounded-xl mb-8 object-contain">
+     <div class="story-content text-xl">
+      <p>Sparky sits by the cat. He finds a piece of string. He can roll the string. Or he can tap his metal paws.</p>
+      <button class="choice-btn" onclick="goTo('page31', 'forward')">If Sparky rolls the string, go to PAGE 31</button>
+      <button class="choice-btn" onclick="goTo('page32', 'forward')">If Sparky taps his paws, go to PAGE 32</button>
+     </div>
+     <div class="page-number">23 / 35</div>
+     <div class="page-corner page-corner-left" onclick="goTo('page15', 'backward')"></div>
+     <div class="page-corner page-corner-right" onclick="goTo('page31', 'forward')"></div>
+    </div>
+   </div>
+
+   <!-- SAYFA 24 -->
+   <div id="page24" class="scene">
+    <div class="book-page">
+     <div class="book-spine"></div>
+     <h2 class="text-center mb-8 text-4xl">The Windmill</h2>
+     <img src="24.jpg" alt="Windmill" class="story-img w-full max-w-xl mx-auto rounded-xl mb-8 object-contain">
+     <div class="story-content text-xl">
+      <p>Sparky looks at the windmill. It has a broken arm. He can tighten the bolts. Or he can just push it hard.</p>
+      <button class="choice-btn" onclick="goTo('page30', 'forward')">If Sparky tightens the bolts, go to PAGE 30</button>
+      <button class="choice-btn" onclick="goTo('page29', 'forward')">If Sparky pushes hard, go to PAGE 29</button>
+     </div>
+     <div class="page-number">24 / 35</div>
+     <div class="page-corner page-corner-left" onclick="goTo('page15', 'backward')"></div>
+     <div class="page-corner page-corner-right" onclick="goTo('page30', 'forward')"></div>
+    </div>
+   </div>
+
+   <!-- SAYFA 25 -->
+   <div id="page25" class="scene">
+    <div class="book-page">
+     <div class="book-spine"></div>
+     <h2 class="text-center mb-8 text-4xl">The Whispering Cave</h2>
+     <img src="25.jpg" alt="Cave" class="story-img w-full max-w-xl mx-auto rounded-xl mb-8 object-contain">
+     <div class="story-content text-xl">
+      <p>Sparky goes into the cave. It is dark. He hears a tiny sound. "Squeak." Something is hiding. Sparky could turn on his eye-light. Or he could sing a song.</p>
+      <button class="choice-btn" onclick="goTo('page26', 'forward')">If Sparky uses his eye-light, go to PAGE 26</button>
+      <button class="choice-btn" onclick="goTo('page27', 'forward')">If Sparky sings a song, go to PAGE 27</button>
+     </div>
+     <div class="page-number">25 / 35</div>
+     <div class="page-corner page-corner-left" onclick="goTo('page15', 'backward')"></div>
+     <div class="page-corner page-corner-right" onclick="goTo('page26', 'forward')"></div>
+    </div>
+   </div>
+
+   <!-- SAYFA 26 -->
+   <div id="page26" class="scene">
+    <div class="book-page">
+     <div class="book-spine"></div>
+     <h2 class="text-center mb-8 text-4xl">The Baby Bat</h2>
+     <img src="26.jpg" alt="Baby Bat" class="story-img w-full max-w-xl mx-auto rounded-xl mb-8 object-contain">
+     <div class="story-content text-xl">
+      <p>Click! Sparky's eye lights up. He sees a tiny baby bat. The bat is shivering. It looks hungry and scared. Sparky wants to help. He can give it a bug. Or he can give it a hug.</p>
+      <button class="choice-btn" onclick="goTo('page28', 'forward')">If Sparky gives a bug, go to PAGE 28</button>
+      <button class="choice-btn" onclick="goTo('page35', 'forward')">If Sparky gives a hug, go to PAGE 35</button>
+     </div>
+     <div class="page-number">26 / 35</div>
+     <div class="page-corner page-corner-left" onclick="goTo('page25', 'backward')"></div>
+     <div class="page-corner page-corner-right" onclick="goTo('page28', 'forward')"></div>
+    </div>
+   </div>
+
+   <!-- SAYFA 27 -->
+   <div id="page27" class="scene">
+    <div class="book-page">
+     <div class="book-spine"></div>
+     <h2 class="text-center mb-8 text-4xl">The Loud Echo (Try Again)</h2>
+     <img src="27.jpg" alt="Echo" class="story-img w-full max-w-xl mx-auto rounded-xl mb-8 object-contain">
+     <div class="story-content text-xl">
+      <p>Sparky sings a song. "LA LA LA!" The cave echoes. The sound gets louder and louder! "LA LA LA!" It hurts Sparky's robot ears. "Ow!" he says, and runs out of the cave. That is OK! Caves are quiet places. Let's try again.</p>
+      <button class="choice-btn btn-try" onclick="goTo('page25', 'backward')">Turn back to PAGE 25 and choose again</button>
+     </div>
+     <div class="page-number">27 / 35</div>
+     <div class="page-corner page-corner-left" onclick="goTo('page25', 'backward')"></div>
+     <div class="page-corner page-corner-right" onclick="goTo('page25', 'backward')"></div>
+    </div>
+   </div>
+
+   <!-- SAYFA 28 -->
+   <div id="page28" class="scene">
+    <div class="book-page">
+     <div class="book-spine"></div>
+     <h2 class="text-center mb-8 text-4xl">The Yucky Bug (Try Again)</h2>
+     <img src="28.jpg" alt="Yucky Bug" class="story-img w-full max-w-xl mx-auto rounded-xl mb-8 object-contain">
+     <div class="story-content text-xl">
+      <p>Sparky finds a worm. He gives it to the bat. The bat sniffs it. Ptooey! The bat spits it out. "Squeak!" The bat is a fruit bat. He likes fruit, not worms! That is OK! Let's try again.</p>
+      <button class="choice-btn btn-try" onclick="goTo('page26', 'backward')">Turn back to PAGE 26 and choose again</button>
+     </div>
+     <div class="page-number">28 / 35</div>
+     <div class="page-corner page-corner-left" onclick="goTo('page26', 'backward')"></div>
+     <div class="page-corner page-corner-right" onclick="goTo('page26', 'backward')"></div>
+    </div>
+   </div>
+
+   <!-- SAYFA 29 -->
+   <div id="page29" class="scene">
+    <div class="book-page">
+     <div class="book-spine"></div>
+     <h2 class="text-center mb-8 text-4xl">The Broken Wood (Try Again)</h2>
+     <img src="29.jpg" alt="Broken Wood" class="story-img w-full max-w-xl mx-auto rounded-xl mb-8 object-contain">
+     <div class="story-content text-xl">
+      <p>Sparky pushes the windmill. Push! But the wood is old. Crack! The wood breaks in his hands. The windmill arm falls down. "Oh no," says Sparky. That is OK! He needs tools, not just strength. Let's try again.</p>
+      <button class="choice-btn btn-try" onclick="goTo('page24', 'backward')">Turn back to PAGE 24 and choose again</button>
+     </div>
+     <div class="page-number">29 / 35</div>
+     <div class="page-corner page-corner-left" onclick="goTo('page24', 'backward')"></div>
+     <div class="page-corner page-corner-right" onclick="goTo('page24', 'backward')"></div>
+    </div>
+   </div>
+
+   <!-- SAYFA 30 (Ending 3) -->
+   <div id="page30" class="scene">
+    <div class="book-page">
+     <div class="book-spine"></div>
+     <h2 class="text-center mb-8 text-4xl">The Hero Robot (Ending 3)</h2>
+     <img src="30.jpg" alt="Hero Robot" class="story-img w-full max-w-xl mx-auto rounded-xl mb-8 object-contain">
+     <div class="story-content text-xl">
+      <p>Sparky uses his tools. He tightens the bolts. Clank, clank, turn! The windmill spins. Whoosh, whoosh! The owl cheers. The cat claps. "You are a hero!" they say. Sparky has friends!</p>
+      <button class="choice-btn btn-end" onclick="goTo('page1', 'forward')">THE END. You found a friend! Read Again.</button>
+     </div>
+     <div class="kunye-box">
+        <p>Developed by Sinan Seden</p>
+     </div>
+     <div class="page-number">30 / 35</div>
+     <div class="page-corner page-corner-left" onclick="goTo('page24', 'backward')"></div>
+     <div class="replay-btn" onclick="goTo('page1', 'forward')">Start Over 🔁</div>
+    </div>
+   </div>
+
+   <!-- SAYFA 31 (Ending 4) -->
+   <div id="page31" class="scene">
+    <div class="book-page">
+     <div class="book-spine"></div>
+     <h2 class="text-center mb-8 text-4xl">The Purring Cat (Ending 4)</h2>
+     <img src="31.jpg" alt="Purring Cat" class="story-img w-full max-w-xl mx-auto rounded-xl mb-8 object-contain">
+     <div class="story-content text-xl">
+      <p>Sparky rolls the string. The cat sees it. The cat pounces! Left and right. Then the cat curls up on Sparky's warm head. Purrrr, purrrr. Sparky smiles. His heart-light glows yellow. He has a friend!</p>
+      <button class="choice-btn btn-end" onclick="goTo('page1', 'forward')">THE END. You found a friend! Read Again.</button>
+     </div>
+     <div class="kunye-box">
+        <p>Developed by Sinan Seden</p>
+     </div>
+     <div class="page-number">31 / 35</div>
+     <div class="page-corner page-corner-left" onclick="goTo('page23', 'backward')"></div>
+     <div class="replay-btn" onclick="goTo('page1', 'forward')">Start Over 🔁</div>
+    </div>
+   </div>
+
+   <!-- SAYFA 32 -->
+   <div id="page32" class="scene">
+    <div class="book-page">
+     <div class="book-spine"></div>
+     <h2 class="text-center mb-8 text-4xl">The Scared Cat (Try Again)</h2>
+     <img src="32.jpg" alt="Scared Cat" class="story-img w-full max-w-xl mx-auto rounded-xl mb-8 object-contain">
+     <div class="story-content text-xl">
+      <p>Sparky taps his metal paws on the ground. Clack, clack, clack! The noise is too loud. The cat gets scared. The cat runs behind the windmill and hides. That is OK! Cats like quiet games. Let's try again.</p>
+      <button class="choice-btn btn-try" onclick="goTo('page23', 'backward')">Turn back to PAGE 23 and choose again</button>
+     </div>
+     <div class="page-number">32 / 35</div>
+     <div class="page-corner page-corner-left" onclick="goTo('page23', 'backward')"></div>
+     <div class="page-corner page-corner-right" onclick="goTo('page23', 'backward')"></div>
+    </div>
+   </div>
+
+   <!-- SAYFA 33 -->
+   <div id="page33" class="scene">
+    <div class="book-page">
+     <div class="book-spine"></div>
+     <h2 class="text-center mb-8 text-4xl">The Squished Dough (Try Again)</h2>
+     <img src="33.jpg" alt="Squished Dough" class="story-img w-full max-w-xl mx-auto rounded-xl mb-8 object-contain">
+     <div class="story-content text-xl">
+      <p>Sparky pushes the dough very hard. Smash! The dough squishes everywhere. It gets on the walls. It gets on the ceiling! "Oh my," says the baker. The dough is too flat to make bread. That is OK! Let's try again.</p>
+      <button class="choice-btn btn-try" onclick="goTo('page12', 'backward')">Turn back to PAGE 12 and choose again</button>
+     </div>
+     <div class="page-number">33 / 35</div>
+     <div class="page-corner page-corner-left" onclick="goTo('page12', 'backward')"></div>
+     <div class="page-corner page-corner-right" onclick="goTo('page12', 'backward')"></div>
+    </div>
+   </div>
+
+   <!-- SAYFA 34 (Ending 5) -->
+   <div id="page34" class="scene">
+    <div class="book-page">
+     <div class="book-spine"></div>
+     <h2 class="text-center mb-8 text-4xl">The Warm Cookie (Ending 5)</h2>
+     <img src="34.jpg" alt="Warm Cookie" class="story-img w-full max-w-xl mx-auto rounded-xl mb-8 object-contain">
+     <div class="story-content text-xl">
+      <p>Sparky is gentle. Push, pull. He kneads the dough softly. "Perfect!" says the baker. She bakes a big cookie. She gives it to Sparky. Sparky's heart-light glows yellow. He has a friend!</p>
+      <button class="choice-btn btn-end" onclick="goTo('page1', 'forward')">THE END. You found a friend! Read Again.</button>
+     </div>
+     <div class="kunye-box">
+        <p>Developed by Sinan Seden</p>
+     </div>
+     <div class="page-number">34 / 35</div>
+     <div class="page-corner page-corner-left" onclick="goTo('page12', 'backward')"></div>
+     <div class="replay-btn" onclick="goTo('page1', 'forward')">Start Over 🔁</div>
+    </div>
+   </div>
+
+   <!-- SAYFA 35 (Ending 6) -->
+   <div id="page35" class="scene">
+    <div class="book-page">
+     <div class="book-spine"></div>
+     <h2 class="text-center mb-8 text-4xl">The Warm Hug (Ending 6)</h2>
+     <img src="35.jpg" alt="Warm Hug" class="story-img w-full max-w-xl mx-auto rounded-xl mb-8 object-contain">
+     <div class="story-content text-xl">
+      <p>Sparky picks up the baby bat. He holds him close. The bat stops shivering. He snuggles into Sparky's warm chest. "Squeak," the bat says happily. They walk out into the sun. Sparky has a best friend!</p>
+      <button class="choice-btn btn-end" onclick="goTo('page1', 'forward')">THE END. You found a friend! Read Again.</button>
+     </div>
+     <div class="kunye-box">
+        <p>Developed by Sinan Seden</p>
+     </div>
+     <div class="page-number">35 / 35</div>
+     <div class="page-corner page-corner-left" onclick="goTo('page26', 'backward')"></div>
+     <div class="replay-btn" onclick="goTo('page1', 'forward')">Start Over 🔁</div>
+    </div>
+   </div>
+
+  </main>
+
+  <script>
+    function goTo(pageId, direction) {
+        var scenes = document.querySelectorAll('.scene');
+        scenes.forEach(function(s) {
+            s.classList.remove('active', 'forward', 'backward');
+        });
+        var target = document.getElementById(pageId);
+        target.classList.add('active');
+        target.classList.add(direction);
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+  </script>
+ </body>
+</html>
